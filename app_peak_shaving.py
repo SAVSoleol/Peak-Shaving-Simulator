@@ -25,8 +25,8 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .block-container {max-width: 1500px; padding-top: 1.6rem; padding-bottom: 2rem;}
-    .ps-title {font-size:2rem;font-weight:850;margin-bottom:.15rem;}
+    .block-container {max-width: 1500px; padding-top: 3.2rem; padding-bottom: 2rem;}
+    .ps-title {font-size:2rem;font-weight:850;line-height:1.2;margin-top:.2rem;margin-bottom:.25rem;}
     .ps-sub {color:#94a3b8;margin-bottom:1.2rem;}
     .ps-grid {display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:12px;margin:14px 0;}
     .ps-card {background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(2,6,23,.9));
@@ -374,7 +374,15 @@ monthly["Mois"] = monthly["Période"].astype(str)
 monthly["Réduction (kW)"] = monthly["Avant (kW)"] - monthly["Après (kW)"]
 monthly = monthly[["Mois", "Avant (kW)", "Après (kW)", "Réduction (kW)"]]
 st.subheader("Pointes mensuelles")
-st.dataframe(monthly.round(1), use_container_width=True, hide_index=True)
+st.dataframe(
+    monthly.round(1),
+    use_container_width=True,
+    hide_index=True,
+    height=min(520, 42 + 35 * (len(monthly) + 1)),
+)
+if len(monthly) >= 12:
+    st.caption("Les 12 mois de l'année sont affichés dans le tableau ci-dessus.")
+
 if billing_mode == "annual_band":
     st.caption(
         "En mode bande annuelle Groupe E, ces réductions mensuelles sont uniquement des diagnostics. "

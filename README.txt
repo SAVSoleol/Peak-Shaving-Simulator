@@ -45,3 +45,5 @@ V1.2 :
 - coût annuel de puissance avant/après ;
 - graphique de la journée du premier échec ;
 - tableau mensuel forcé sur janvier-décembre.
+
+V1.3 : correction du titre rogné en haut et hauteur du tableau mensuel ajustée pour afficher les 12 mois sans masquer novembre/décembre.
