@@ -161,6 +161,16 @@ def f0(v):
 def f1(v):
     return f"{float(v):,.1f}".replace(",", " ")
 
+def _limiter_text(reason: str) -> str:
+    labels = {
+        "power": "puissance de décharge maximale atteinte",
+        "energy": "énergie disponible / SOC minimum limitant",
+        "power_and_energy": "puissance et énergie toutes deux limitantes",
+        "boundary": "intervalle le plus proche de la limite soutenable",
+        "other": "combinaison de contraintes",
+    }
+    return labels.get(str(reason), "intervalle le plus proche de la limite soutenable")
+
 st.markdown(
     f"""
     <div class="ps-grid">
@@ -180,10 +190,37 @@ c2.metric("Recharge réseau", f"{f0(result.grid_charge_kWh)} kWh")
 c3.metric("Recharge PV", f"{f0(result.pv_charge_kWh)} kWh")
 c4.metric("SOC minimum simulé", f"{np.min(result.soc_pct):.0f} %")
 
+power_headroom = max(discharge_power_kW - result.critical_discharge_kW, 0.0)
+soc_headroom = max(result.critical_soc_pct - soc_min_pct, 0.0)
+d1, d2 = st.columns(2)
+d1.metric(
+    "Marge puissance à l'intervalle limitant",
+    f"{power_headroom:.1f} kW",
+    help="Faible marge = augmenter les kW de la batterie peut améliorer l'écrêtage."
+)
+d2.metric(
+    "Marge SOC à l'intervalle limitant",
+    f"{soc_headroom:.1f} points",
+    help="Faible marge = augmenter les kWh / l'énergie disponible peut améliorer l'écrêtage."
+)
+
+if result.binding_reason == "power":
+    st.warning("La limite actuelle est principalement liée aux **kW de décharge**. Une batterie plus puissante pourrait abaisser davantage le seuil.")
+elif result.binding_reason == "energy":
+    st.warning("La limite actuelle est principalement liée aux **kWh disponibles / SOC**. Une capacité énergétique plus grande pourrait abaisser davantage le seuil.")
+elif result.binding_reason == "power_and_energy":
+    st.warning("La configuration est limitée à la fois par les **kW** et les **kWh**.")
+else:
+    st.caption("La configuration atteint son seuil soutenable sans saturation nette d'une seule contrainte.")
+
 if result.critical_timestamp is not None:
     st.info(
-        f"Intervalle limitant après batterie : **{result.critical_timestamp:%d.%m.%Y %H:%M}**. "
-        f"Le seuil affiché est le plus bas que cette configuration peut tenir sur toute la période analysée."
+        f"**Intervalle limitant : {result.critical_timestamp:%d.%m.%Y %H:%M}** — "
+        f"{_limiter_text(result.binding_reason)}. "
+        f"Avant : **{result.critical_before_kW:.1f} kW**, après : **{result.critical_after_kW:.1f} kW**, "
+        f"décharge batterie : **{result.critical_discharge_kW:.1f} kW**, "
+        f"SOC : **{result.critical_soc_pct:.1f} %**. "
+        "C'est cet intervalle qui se trouve le plus près de la limite de la configuration."
     )
 
 # --------------------------------------------------------------- Overview chart
@@ -235,7 +272,7 @@ fig2.add_trace(go.Scatter(
 ))
 fig2.add_hline(y=result.target_kW, line_dash="dash", line_color="#4f8cff")
 fig2.update_layout(
-    title=f"Journée critique : {crit_ts:%d.%m.%Y}",
+    title=f"Journée limitante : {crit_ts:%d.%m.%Y} — {_limiter_text(result.binding_reason)}",
     xaxis_title="Heure",
     yaxis_title="kW",
     height=430,
@@ -280,9 +317,19 @@ monthly = pd.DataFrame({
 monthly["Mois"] = monthly["timestamp"].dt.to_period("M").astype(str)
 monthly = monthly.groupby("Mois")[["Avant (kW)", "Après (kW)"]].max().reset_index()
 monthly["Réduction (kW)"] = monthly["Avant (kW)"] - monthly["Après (kW)"]
-monthly["Économie puissance (CHF)"] = monthly["Réduction (kW)"] * power_tariff
 st.subheader("Pointes mensuelles")
 st.dataframe(monthly.round(1), use_container_width=True, hide_index=True)
+if billing_mode == "annual_band":
+    st.caption(
+        "En mode bande annuelle Groupe E, ces réductions mensuelles sont uniquement des diagnostics. "
+        f"L'économie contractuelle retenue est calculée sur la baisse de la pointe annuelle : "
+        f"{result.reduction_kW:.1f} kW × {power_tariff:.2f} CHF/kW/mois × 12 = "
+        f"{result.annual_saving_chf:,.0f} CHF/an.".replace(",", " ")
+    )
+else:
+    st.caption(
+        "En mode maximum mensuel, l'économie est calculée mois par mois à partir des maxima mensuels."
+    )
 
 st.caption(
     "Le calcul recherche le plus petit seuil que la batterie peut maintenir sur toute la courbe. "

@@ -41,6 +41,10 @@ class PeakResult:
     battery_discharge_kWh_series: np.ndarray
     binding_reason: str
     critical_timestamp: pd.Timestamp | None
+    critical_before_kW: float
+    critical_after_kW: float
+    critical_discharge_kW: float
+    critical_soc_pct: float
 
 
 def _eta_components(roundtrip_eff: float) -> tuple[float, float]:
@@ -147,12 +151,45 @@ def simulate_target(
 
     before_kw = imp / dt_hours
     after_kw = imp_after / dt_hours
+    discharge_kw = discharge / dt_hours
     peak_before = float(np.max(before_kw)) if n else 0.0
     peak_after = float(np.max(after_kw)) if n else 0.0
-    max_idx = int(np.argmax(after_kw)) if n else 0
 
-    if peak_after <= target_kW + 1e-6:
-        reason = "target_achieved"
+    # Identify the interval that really constrains a lower target:
+    # among intervals sitting at/near the achieved ceiling, prefer the one with
+    # the lowest SOC margin and/or the highest discharge-power usage.
+    if n:
+        ceiling = peak_after
+        near = np.where(after_kw >= ceiling - max(0.5, 0.002 * max(ceiling, 1.0)))[0]
+        if len(near) == 0:
+            near = np.array([int(np.argmax(after_kw))])
+
+        soc_margin_kWh = soc_series[near] - soc_min
+        power_margin_kW = max(float(discharge_power_kW), 0.0) - discharge_kw[near]
+
+        # Low SOC and low power margin are both "bad"; normalize to build a score.
+        soc_span = max(cap - soc_min, 1e-9)
+        p_span = max(float(discharge_power_kW), 1e-9)
+        score = (soc_margin_kWh / soc_span) + (power_margin_kW / p_span)
+        crit_local = int(np.argmin(score))
+        max_idx = int(near[crit_local])
+    else:
+        max_idx = 0
+
+    soc_at_crit = float(soc_series[max_idx]) if n else 0.0
+    dis_at_crit_kw = float(discharge_kw[max_idx]) if n else 0.0
+    at_power_limit = dis_at_crit_kw >= max(float(discharge_power_kW), 0.0) - max(0.5, 0.002 * max(float(discharge_power_kW), 1.0))
+    at_energy_limit = soc_at_crit <= soc_min + max(0.5, 0.002 * max(cap, 1.0))
+
+    if at_power_limit and at_energy_limit:
+        reason = "power_and_energy"
+    elif at_power_limit:
+        reason = "power"
+    elif at_energy_limit:
+        reason = "energy"
+    elif peak_after <= target_kW + 1e-6:
+        # Target is sustainable, but this is the interval closest to the boundary.
+        reason = "boundary"
     elif power_limited and energy_limited:
         reason = "power_and_energy"
     elif power_limited:
@@ -183,6 +220,10 @@ def simulate_target(
         "battery_discharge_kWh_series": discharge,
         "binding_reason": reason,
         "critical_timestamp": pd.Timestamp(ts[max_idx]) if n else None,
+        "critical_before_kW": float(before_kw[max_idx]) if n else 0.0,
+        "critical_after_kW": float(after_kw[max_idx]) if n else 0.0,
+        "critical_discharge_kW": float(discharge_kw[max_idx]) if n else 0.0,
+        "critical_soc_pct": float((soc_series[max_idx] / cap * 100.0) if (n and cap > 0) else 0.0),
     }
 
 
@@ -296,6 +337,10 @@ def find_min_sustainable_target(
         battery_discharge_kWh_series=np.asarray(r["battery_discharge_kWh_series"], dtype=float),
         binding_reason=str(r["binding_reason"]),
         critical_timestamp=r["critical_timestamp"],
+        critical_before_kW=float(r["critical_before_kW"]),
+        critical_after_kW=float(r["critical_after_kW"]),
+        critical_discharge_kW=float(r["critical_discharge_kW"]),
+        critical_soc_pct=float(r["critical_soc_pct"]),
     )
 
 

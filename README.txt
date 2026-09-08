@@ -35,3 +35,5 @@ streamlit run app_peak_shaving.py
 Fichier de test fourni par l'utilisateur
 ----------------------------------------
 Mivelaz_Bois_2025_Import_Export_kW(3).xlsx
+
+V1.1 : identification de l'intervalle réellement limitant, diagnostic kW/kWh, correction du tableau mensuel en bande annuelle.
