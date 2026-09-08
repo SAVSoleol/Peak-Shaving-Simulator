@@ -53,3 +53,11 @@ V1.4 :
 - suppression du delta rouge trompeur sur l'économie ;
 - tableau mensuel limité aux périodes réellement présentes dans le fichier ;
 - diagnostic séparé en rouge (échec), bleu (diagnostic) et vert (action possible).
+
+V1.5 :
+- rapport PDF 3 pages intégré ;
+- charte graphique calquée sur le rapport Battery Sizer Soleol ;
+- page 1 synthèse / coûts / batterie ;
+- page 2 graphiques et diagnostic du premier seuil impossible ;
+- page 3 top 10, pointes mensuelles et formule d'économie ;
+- bouton de téléchargement PDF dans Streamlit.

@@ -15,6 +15,7 @@ import streamlit as st
 
 from loaders import load_meter_file
 from peak_shaving_engine import find_min_sustainable_target, top_peaks_table
+from report_peak_shaving import generate_peak_shaving_report
 
 st.set_page_config(
     page_title="Peak Shaving Simulator",
@@ -50,6 +51,13 @@ st.markdown(
 
 # --------------------------------------------------------------- Sidebar
 st.sidebar.header("Paramètres")
+
+client_name = st.sidebar.text_input(
+    "Nom du client",
+    value="",
+    placeholder="Ex. Mivelaz Bois SA",
+    help="Ce nom apparaîtra dans le rapport PDF.",
+)
 
 st.sidebar.markdown("**Batterie**")
 capacity_kWh = st.sidebar.number_input(
@@ -431,6 +439,31 @@ else:
     st.caption(
         "En mode maximum mensuel, l'économie est calculée mois par mois à partir des maxima mensuels."
     )
+
+st.divider()
+st.subheader("Rapport PDF")
+
+report_bytes = generate_peak_shaving_report(
+    df=df,
+    meta=meta,
+    result=result,
+    client_name=client_name,
+    capacity_kWh=capacity_kWh,
+    charge_power_kW=charge_power_kW,
+    discharge_power_kW=discharge_power_kW,
+    roundtrip_eff=roundtrip_eff,
+    soc_min_pct=soc_min_pct,
+    reserve_target_pct=reserve_target_pct,
+    grid_recharge=grid_recharge,
+    power_tariff=power_tariff,
+)
+
+st.download_button(
+    "Télécharger le rapport PDF",
+    report_bytes,
+    file_name="rapport_peak_shaving.pdf",
+    mime="application/pdf",
+)
 
 st.caption(
     f"Seuil garanti : {result.target_kW:.1f} kW. "
