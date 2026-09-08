@@ -72,6 +72,17 @@ class ReportPDF(FPDF):
         self.cell(0, 5, _tx(f"Page {self.page_no()} / {{nb}}"), align="R")
 
 
+def _resolve_header_image() -> str | None:
+    candidates = [
+        Path("rapport_header_montagnes.png"),
+        Path(__file__).resolve().parent / "rapport_header_montagnes.png",
+    ]
+    for p in candidates:
+        if p.is_file():
+            return str(p)
+    return None
+
+
 def _resolve_logo_path(logo_path: str | None = None) -> str | None:
     candidates = []
     if logo_path:
@@ -170,12 +181,12 @@ def _metric_box(
     pdf.rect(x, y, w, h, style="DF")
 
     pdf.set_xy(x + 4, y + 4)
-    pdf.set_font("Arial", "B", 6.5)
+    pdf.set_font("Arial", "B", 6.8)
     pdf.set_text_color(*TEXT)
     pdf.multi_cell(w - 8, 3.6, _tx(label.upper()), align="L")
 
     pdf.set_xy(x + 4, y + 13)
-    pdf.set_font("Arial", "B", 13.5)
+    pdf.set_font("Arial", "B", 14.2)
     pdf.set_text_color(*color)
     pdf.cell(w - 8, 8, _tx(value))
 
@@ -298,37 +309,86 @@ def _page_1(
     )
 
     x0 = 58
-    pdf.set_xy(x0, 14)
-    pdf.set_font("Arial", "B", 17)
+
+    # Header inspired by the approved mockup:
+    # strong title on the left, panoramic Swiss landscape fading to white on the right.
+    pdf.set_xy(x0, 13)
+    pdf.set_font("Arial", "B", 18)
     pdf.set_text_color(*SOLEOL_ORANGE)
-    pdf.cell(140, 8, _tx("SYNTHÈSE PEAK SHAVING"))
+    pdf.cell(75, 8, _tx("Peak Shaving"))
+
+    pdf.set_xy(x0, 22)
+    pdf.set_font("Arial", "B", 13)
+    pdf.set_text_color(*TEXT)
+    pdf.cell(75, 6, _tx("Synthèse de l'étude"))
+
+    header_image = _resolve_header_image()
+    if header_image:
+        pdf.image(header_image, x=x0 + 74, y=11, w=70, h=24)
+
+    pdf.set_xy(x0, 37)
+    pdf.set_font("Arial", "", 8.2)
+    pdf.set_text_color(*MUTED)
+    pdf.multi_cell(
+        140, 4.2,
+        _tx("Analyse de la puissance quart-horaire et recherche automatique "
+            "du seuil minimal soutenable par une batterie.")
+    )
+
+    pdf.set_draw_color(*BORDER)
+    pdf.line(x0, 51, x0 + 144, 51)
+
+    _section_title(pdf, x0, 55, "RÉSULTATS PRINCIPAUX")
 
     annual_before = result.peak_before_kW * power_tariff * 12
     annual_after = result.peak_after_kW * power_tariff * 12
 
-    w, gap, h = 35, 2, 30
-    y1 = 31
+    # Principal results: 3 columns x 2 rows, larger and easier to read.
+    w, gap, h = 46, 3, 31
+    y1 = 66
     cards1 = [
         ("Pointe avant", f"{result.peak_before_kW:.0f} kW", "Maximum mesuré", BLUE),
         ("Seuil soutenable", f"{result.target_kW:.0f} kW", "Trouvé automatiquement", GREEN),
-        ("Pointe après", f"{result.peak_after_kW:.0f} kW", "Après simulation", GREEN),
-        ("Écrêtage garanti", f"{result.reduction_kW:.0f} kW", "Réduction du maximum", GREEN),
+        ("Pointe après", f"{result.peak_after_kW:.0f} kW", "Après simulation annuelle", GREEN),
     ]
     for i, (lab, val, sub, col) in enumerate(cards1):
         _metric_box(pdf, x0 + i*(w+gap), y1, w, h, lab, val, sub, col)
 
-    y2 = 68
+    y2 = 102
     cards2 = [
+        ("Écrêtage garanti", f"{result.reduction_kW:.0f} kW", "Réduction du maximum", GREEN),
         ("Coût puissance avant", f"{_fmt0(annual_before)} CHF/an", "Avant Peak Shaving", BLUE),
         ("Coût puissance après", f"{_fmt0(annual_after)} CHF/an", "Après écrêtage", GREEN),
-        ("Économie puissance", f"{_fmt0(result.annual_saving_chf)} CHF/an", f"{power_tariff:.2f} CHF/kW/mois", GREEN),
-        ("SOC minimum simulé", f"{np.min(result.soc_pct):.0f} %", f"SOC minimum : {soc_min_pct:.0f} %", RED if np.min(result.soc_pct) <= soc_min_pct + 1 else BLUE),
     ]
     for i, (lab, val, sub, col) in enumerate(cards2):
         _metric_box(pdf, x0 + i*(w+gap), y2, w, h, lab, val, sub, col)
 
-    _section_title(pdf, x0, 107, "CONFIGURATION ET FLUX D'ÉNERGIE")
-    y3 = 118
+    # Main commercial result, visually dominant.
+    pdf.set_draw_color(*GREEN)
+    pdf.set_fill_color(*LIGHT_GREEN)
+    pdf.rect(x0, 140, 144, 29, style="DF")
+    pdf.set_xy(x0 + 5, 145)
+    pdf.set_font("Arial", "B", 7.5)
+    pdf.set_text_color(*GREEN)
+    pdf.cell(134, 4, _tx("ÉCONOMIE ANNUELLE PEAK SHAVING"), align="C")
+    pdf.set_xy(x0 + 5, 151)
+    pdf.set_font("Arial", "B", 17)
+    pdf.cell(134, 8, _tx(f"{_fmt0(result.annual_saving_chf)} CHF/an"), align="C")
+    pdf.set_xy(x0 + 5, 160)
+    pdf.set_font("Arial", "", 6.8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(
+        134, 4,
+        _tx(f"Réduction de {result.reduction_kW:.0f} kW sur la pointe annuelle - "
+            f"{power_tariff:.2f} CHF/kW/mois"),
+        align="C",
+    )
+
+    _section_title(pdf, x0, 176, "CONFIGURATION ET PARAMÈTRES")
+
+    # Technical information: smaller cards, 4 columns x 2 rows.
+    sw, sgap, sh = 35, 2, 27
+    y3 = 187
     cards3 = [
         ("Capacité batterie", f"{capacity_kWh:.0f} kWh", "Paramètre de simulation", BLUE),
         ("Puissance charge", f"{charge_power_kW:.0f} kW", "Limite de charge", BLUE),
@@ -336,17 +396,17 @@ def _page_1(
         ("Rendement", f"{roundtrip_eff*100:.0f} %", "Aller-retour", BLUE),
     ]
     for i, (lab, val, sub, col) in enumerate(cards3):
-        _metric_box(pdf, x0 + i*(w+gap), y3, w, h, lab, val, sub, col)
+        _metric_box(pdf, x0 + i*(sw+sgap), y3, sw, sh, lab, val, sub, col)
 
-    y4 = 155
+    y4 = 219
     cards4 = [
         ("Énergie déchargée", f"{_fmt0(result.battery_discharge_kWh)} kWh", "Sur la période", BLUE),
         ("Recharge réseau", f"{_fmt0(result.grid_charge_kWh)} kWh", "Sous le seuil", BLUE),
         ("Recharge PV", f"{_fmt0(result.pv_charge_kWh)} kWh", "Surplus valorisé", GREEN),
-        ("Réserve Peak Shaving", f"{reserve_target_pct:.0f} %", "SOC cible", BLUE),
+        ("SOC minimum simulé", f"{np.min(result.soc_pct):.0f} %", f"SOC mini : {soc_min_pct:.0f} %", RED if np.min(result.soc_pct) <= soc_min_pct + 1 else BLUE),
     ]
     for i, (lab, val, sub, col) in enumerate(cards4):
-        _metric_box(pdf, x0 + i*(w+gap), y4, w, h, lab, val, sub, col)
+        _metric_box(pdf, x0 + i*(sw+sgap), y4, sw, sh, lab, val, sub, col)
 
     conclusion = (
         f"La batterie simulée de {capacity_kWh:.0f} kWh / {discharge_power_kW:.0f} kW "
@@ -354,19 +414,8 @@ def _page_1(
         f"L'écrêtage garanti de {result.reduction_kW:.0f} kW représente environ "
         f"{_fmt0(result.annual_saving_chf)} CHF/an d'économie de puissance."
     )
-    _info_box(pdf, x0, 195, 144, 30, "CONCLUSION", conclusion, LIGHT_GREEN, GREEN)
-
-    pdf.set_xy(x0, 231)
-    pdf.set_font("Arial", "", 7.8)
-    pdf.set_text_color(*MUTED)
-    pdf.multi_cell(
-        144, 4,
-        _tx(
-            f"Hypothèses : recharge réseau {'autorisée' if grid_recharge else 'désactivée'}, "
-            f"SOC mini {soc_min_pct:.0f} %, réserve cible {reserve_target_pct:.0f} %, "
-            f"tarif puissance {power_tariff:.2f} CHF/kW/mois."
-        )
-    )
+    # Compact conclusion at the bottom of page 1.
+    _info_box(pdf, x0, 252, 144, 27, "CONCLUSION", conclusion, LIGHT_BLUE, BLUE)
 
 
 def _page_2(
@@ -388,7 +437,7 @@ def _page_2(
     )
     x0 = 58
     pdf.set_xy(x0, 14)
-    pdf.set_font("Arial", "B", 17)
+    pdf.set_font("Arial", "B", 17.5)
     pdf.set_text_color(*SOLEOL_ORANGE)
     pdf.cell(140, 8, _tx("ANALYSE DU PEAK SHAVING"))
 

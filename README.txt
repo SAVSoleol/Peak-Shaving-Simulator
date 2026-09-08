@@ -61,3 +61,10 @@ V1.5 :
 - page 2 graphiques et diagnostic du premier seuil impossible ;
 - page 3 top 10, pointes mensuelles et formule d'économie ;
 - bouton de téléchargement PDF dans Streamlit.
+
+V1.6 :
+- ajout de l'image panoramique avec fondu blanc dans l'en-tête page 1 ;
+- fichier image à conserver sous le nom exact : rapport_header_montagnes.png ;
+- page 1 rapprochée de la maquette : titre Peak Shaving + Synthèse de l'étude,
+  6 KPI principaux, grande carte économie, paramètres techniques plus petits ;
+- tailles de police et hiérarchie visuelle revues.
