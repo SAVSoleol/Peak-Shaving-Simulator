@@ -72,16 +72,25 @@ discharge_power_kW = st.sidebar.number_input(
 roundtrip_eff = st.sidebar.slider(
     "Rendement aller-retour", min_value=0.50, max_value=1.00, value=0.80, step=0.01
 )
-soc_min_pct = st.sidebar.slider(
-    "SOC minimum (%)", min_value=0, max_value=50, value=10, step=5
-)
+TECHNICAL_SOC_MIN_PCT = 5.0
+soc_min_pct = TECHNICAL_SOC_MIN_PCT
+st.sidebar.caption("SOC minimum technique fixe : **5 %**")
+
 reserve_target_pct = st.sidebar.slider(
-    "Réserve Peak Shaving cible (%)",
-    min_value=10, max_value=100, value=80, step=5,
+    "Frontière réserve Peak Shaving (%)",
+    min_value=int(TECHNICAL_SOC_MIN_PCT),
+    max_value=80,
+    value=30,
+    step=5,
     help=(
-        "SOC que le contrôleur cherche à restaurer avant les pointes. "
-        "La batterie peut descendre jusqu'au SOC minimum pendant l'écrêtage."
+        "Zone réellement réservée au Peak Shaving : de 5 % jusqu'à cette frontière. "
+        "La zone au-dessus de la frontière est destinée à l'autoconsommation dans le Battery Sizer."
     ),
+)
+st.sidebar.caption(
+    f"**0-{TECHNICAL_SOC_MIN_PCT:.0f} % : technique** · "
+    f"**{TECHNICAL_SOC_MIN_PCT:.0f}-{reserve_target_pct:.0f} % : Peak Shaving** · "
+    f"**{reserve_target_pct:.0f}-100 % : autoconsommation**"
 )
 grid_recharge = st.sidebar.checkbox(
     "Autoriser la recharge depuis le réseau",
@@ -140,6 +149,10 @@ if df.empty:
 
 dt_hours = float(meta.dt_hours)
 measured_peak = float(df["import_kWh"].max() / dt_hours) if dt_hours > 0 else 0.0
+
+technical_reserve_kWh = capacity_kWh * TECHNICAL_SOC_MIN_PCT / 100.0
+peak_reserve_kWh = capacity_kWh * max(reserve_target_pct - TECHNICAL_SOC_MIN_PCT, 0.0) / 100.0
+autoconsumption_zone_kWh = capacity_kWh * max(100.0 - reserve_target_pct, 0.0) / 100.0
 
 st.caption(
     f"Source détectée : **{meta.vendor}** · pas de temps : **{dt_hours*60:.0f} min** · "
@@ -217,6 +230,29 @@ st.markdown(
       </div>
     </div>
     """.replace(",", " "),
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    f"""
+    <div class="ps-grid" style="grid-template-columns:repeat(3,minmax(220px,1fr));">
+      <div class="ps-card">
+        <div class="ps-label">Réserve technique</div>
+        <div class="ps-value blue">{technical_reserve_kWh:.0f} kWh</div>
+        <div class="ps-subv">0-{TECHNICAL_SOC_MIN_PCT:.0f} % · non utilisable</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Réserve Peak Shaving</div>
+        <div class="ps-value green">{peak_reserve_kWh:.0f} kWh</div>
+        <div class="ps-subv">{TECHNICAL_SOC_MIN_PCT:.0f}-{reserve_target_pct:.0f} %</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Zone autoconsommation</div>
+        <div class="ps-value blue">{autoconsumption_zone_kWh:.0f} kWh</div>
+        <div class="ps-subv">{reserve_target_pct:.0f}-100 % · non utilisée par ce simulateur</div>
+      </div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 

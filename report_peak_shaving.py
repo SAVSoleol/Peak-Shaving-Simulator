@@ -637,7 +637,7 @@ def _page_3(
         ("Tarif puissance", f"{power_tariff:.2f} CHF/kW/mois"),
         ("Précision du seuil", f"{target_resolution_kW:.1f} kW"),
         ("Rendement aller-retour", f"{roundtrip_eff*100:.0f} %"),
-        ("SOC minimum", f"{soc_min_pct:.0f} %"),
+        ("SOC technique fixe", f"{soc_min_pct:.0f} %"),
         ("Réserve Peak Shaving", f"{reserve_target_pct:.0f} %"),
         ("Recharge depuis le réseau", "Oui" if grid_recharge else "Non"),
     ]

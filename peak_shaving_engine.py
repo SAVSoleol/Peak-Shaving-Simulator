@@ -119,9 +119,11 @@ def simulate_target(
     energy_limited = False
 
     for i in range(n):
-        # 1) Use PV export first. PV may charge the battery all the way to 100%.
+        # 1) Use PV export first, but only to restore the dedicated Peak Shaving
+        # reserve. The zone above the reserve boundary belongs to autoconsumption
+        # and is intentionally outside this dedicated simulator.
         pv_in = min(exp[i], max_charge_step)
-        pv_in = min(pv_in, max((cap - soc) / eta_c, 0.0))
+        pv_in = min(pv_in, max((reserve - soc) / eta_c, 0.0))
         pv_in = max(pv_in, 0.0)
         soc += pv_in * eta_c
         exp_after[i] = max(exp[i] - pv_in, 0.0)
