@@ -68,3 +68,11 @@ V1.6 :
 - page 1 rapprochée de la maquette : titre Peak Shaving + Synthèse de l'étude,
   6 KPI principaux, grande carte économie, paramètres techniques plus petits ;
 - tailles de police et hiérarchie visuelle revues.
+
+V1.7 :
+- textes secondaires des KPI page 1 agrandis ;
+- conclusion page 1 complétée par la cause limitante et l'orientation kWh/kW ;
+- graphiques page 2 agrandis et rendus plus lisibles ;
+- premier seuil impossible présenté sous forme de lignes structurées ;
+- page 3 : ajout hypothèses, formule d'économie et remarques ;
+- 2026-01 supprimé du tableau mensuel du rapport uniquement.

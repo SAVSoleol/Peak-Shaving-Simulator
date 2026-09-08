@@ -175,26 +175,36 @@ def _metric_box(
     value: str,
     sub: str = "",
     color=BLUE,
+    compact: bool = False,
 ):
     pdf.set_draw_color(*BORDER)
     pdf.set_fill_color(255, 255, 255)
     pdf.rect(x, y, w, h, style="DF")
 
-    pdf.set_xy(x + 4, y + 4)
-    pdf.set_font("Arial", "B", 6.8)
-    pdf.set_text_color(*TEXT)
-    pdf.multi_cell(w - 8, 3.6, _tx(label.upper()), align="L")
+    if compact:
+        label_y, value_y, sub_y = y + 3, y + 10.5, y + h - 6.5
+        label_size, value_size, sub_size = 6.5, 12.4, 6.1
+        label_line, sub_line = 3.3, 3.1
+    else:
+        label_y, value_y, sub_y = y + 4, y + 13, y + h - 9
+        label_size, value_size, sub_size = 7.1, 14.2, 6.9
+        label_line, sub_line = 3.6, 3.7
 
-    pdf.set_xy(x + 4, y + 13)
-    pdf.set_font("Arial", "B", 14.2)
+    pdf.set_xy(x + 4, label_y)
+    pdf.set_font("Arial", "B", label_size)
+    pdf.set_text_color(*TEXT)
+    pdf.multi_cell(w - 8, label_line, _tx(label.upper()), align="L")
+
+    pdf.set_xy(x + 4, value_y)
+    pdf.set_font("Arial", "B", value_size)
     pdf.set_text_color(*color)
-    pdf.cell(w - 8, 8, _tx(value))
+    pdf.cell(w - 8, 7, _tx(value))
 
     if sub:
-        pdf.set_xy(x + 4, y + h - 9)
-        pdf.set_font("Arial", "", 6.4)
+        pdf.set_xy(x + 4, sub_y)
+        pdf.set_font("Arial", "", sub_size)
         pdf.set_text_color(*MUTED)
-        pdf.multi_cell(w - 8, 3.5, _tx(sub))
+        pdf.multi_cell(w - 8, sub_line, _tx(sub))
 
 
 def _info_box(
@@ -225,14 +235,14 @@ def _plot_annual(df, result, dt_hours: float) -> BytesIO:
     ax.plot(ts, before, lw=0.85, color="#FB8C00", label="Puissance avant")
     ax.plot(ts, after, lw=0.95, color="#2EAD63", label="Puissance après")
     ax.axhline(result.target_kW, color="#2563EB", ls="--", lw=1.1, label=f"Seuil {result.target_kW:.0f} kW")
-    ax.set_ylabel("kW", fontsize=8)
-    ax.set_title("Puissance réseau avant / après Peak Shaving", fontsize=11, weight="bold", pad=8)
-    ax.legend(ncol=3, fontsize=7, frameon=False, loc="upper center")
+    ax.set_ylabel("kW", fontsize=9)
+    ax.set_title("Puissance réseau avant / après Peak Shaving", fontsize=12, weight="bold", pad=6)
+    ax.legend(ncol=3, fontsize=8.3, frameon=False, loc="upper center")
     ax.grid(alpha=.18)
-    ax.tick_params(axis="both", labelsize=7)
-    fig.tight_layout(pad=1.1)
+    ax.tick_params(axis="both", labelsize=8)
+    fig.subplots_adjust(left=0.075, right=0.995, top=0.83, bottom=0.17)
     buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=165, bbox_inches="tight", pad_inches=.12)
+    fig.savefig(buf, format="png", dpi=165, bbox_inches="tight", pad_inches=.03)
     plt.close(fig)
     buf.seek(0)
     return buf
@@ -254,17 +264,17 @@ def _plot_failed_day(df, result, dt_hours: float) -> BytesIO:
     ax.plot(x, discharge, lw=1.25, ls=":", color="#7C3AED", label="Décharge batterie")
     ax.axhline(result.target_kW, color="#2563EB", ls="--", lw=1.0, label=f"Garanti {result.target_kW:.0f} kW")
     ax.axhline(result.failed_target_kW, color="#D32F2F", ls=":", lw=1.0, label=f"Impossible {result.failed_target_kW:.0f} kW")
-    ax.set_ylabel("kW", fontsize=8)
+    ax.set_ylabel("kW", fontsize=9)
     ax.set_title(
         f"Premier seuil impossible - {pd.Timestamp(result.failed_timestamp):%d.%m.%Y}",
-        fontsize=11, weight="bold", pad=8,
+        fontsize=12, weight="bold", pad=6,
     )
-    ax.legend(ncol=5, fontsize=6.8, frameon=False, loc="upper center")
+    ax.legend(ncol=5, fontsize=7.8, frameon=False, loc="upper center")
     ax.grid(alpha=.18)
-    ax.tick_params(axis="both", labelsize=7)
-    fig.tight_layout(pad=1.1)
+    ax.tick_params(axis="both", labelsize=8)
+    fig.subplots_adjust(left=0.075, right=0.995, top=0.83, bottom=0.17)
     buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=165, bbox_inches="tight", pad_inches=.12)
+    fig.savefig(buf, format="png", dpi=165, bbox_inches="tight", pad_inches=.03)
     plt.close(fig)
     buf.seek(0)
     return buf
@@ -277,14 +287,14 @@ def _plot_soc(df, result, soc_min_pct: float, reserve_pct: float) -> BytesIO:
     ax.axhline(reserve_pct, color="#2563EB", ls=":", lw=1.0, label=f"Réserve cible {reserve_pct:.0f}%")
     ax.axhline(soc_min_pct, color="#D32F2F", ls="--", lw=1.0, label=f"SOC min {soc_min_pct:.0f}%")
     ax.set_ylim(0, 105)
-    ax.set_ylabel("SOC (%)", fontsize=8)
-    ax.set_title("État de charge de la batterie", fontsize=10.5, weight="bold", pad=7)
-    ax.legend(ncol=2, fontsize=7, frameon=False, loc="upper center")
+    ax.set_ylabel("SOC (%)", fontsize=9)
+    ax.set_title("État de charge de la batterie", fontsize=11.5, weight="bold", pad=5)
+    ax.legend(ncol=2, fontsize=8, frameon=False, loc="upper center")
     ax.grid(alpha=.18)
-    ax.tick_params(axis="both", labelsize=7)
-    fig.tight_layout(pad=1.0)
+    ax.tick_params(axis="both", labelsize=8)
+    fig.subplots_adjust(left=0.075, right=0.995, top=0.82, bottom=0.18)
     buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=165, bbox_inches="tight", pad_inches=.12)
+    fig.savefig(buf, format="png", dpi=165, bbox_inches="tight", pad_inches=.03)
     plt.close(fig)
     buf.seek(0)
     return buf
@@ -396,7 +406,7 @@ def _page_1(
         ("Rendement", f"{roundtrip_eff*100:.0f} %", "Aller-retour", BLUE),
     ]
     for i, (lab, val, sub, col) in enumerate(cards3):
-        _metric_box(pdf, x0 + i*(sw+sgap), y3, sw, sh, lab, val, sub, col)
+        _metric_box(pdf, x0 + i*(sw+sgap), y3, sw, sh, lab, val, sub, col, compact=True)
 
     y4 = 219
     cards4 = [
@@ -406,16 +416,38 @@ def _page_1(
         ("SOC minimum simulé", f"{np.min(result.soc_pct):.0f} %", f"SOC mini : {soc_min_pct:.0f} %", RED if np.min(result.soc_pct) <= soc_min_pct + 1 else BLUE),
     ]
     for i, (lab, val, sub, col) in enumerate(cards4):
-        _metric_box(pdf, x0 + i*(sw+sgap), y4, sw, sh, lab, val, sub, col)
+        _metric_box(pdf, x0 + i*(sw+sgap), y4, sw, sh, lab, val, sub, col, compact=True)
+
+    if result.failed_reason == "energy":
+        limit_sentence = (
+            f"La limite actuelle est principalement énergétique : le SOC minimum de "
+            f"{soc_min_pct:.0f} % est atteint au premier seuil inférieur. Une capacité "
+            f"en kWh plus importante pourrait permettre d'abaisser davantage la bande."
+        )
+    elif result.failed_reason == "power":
+        limit_sentence = (
+            "La limite actuelle vient principalement de la puissance de décharge. "
+            "Une puissance batterie plus élevée pourrait permettre d'abaisser davantage la bande."
+        )
+    elif result.failed_reason == "power_and_energy":
+        limit_sentence = (
+            "La puissance et l'énergie sont toutes deux limitantes. Une augmentation des kW et des kWh "
+            "serait nécessaire pour réduire davantage la bande."
+        )
+    else:
+        limit_sentence = (
+            "La limite est liée à une succession de pointes et à la restauration de la réserve. "
+            "Une capacité supérieure et/ou une stratégie de recharge adaptée pourraient améliorer le résultat."
+        )
 
     conclusion = (
         f"La batterie simulée de {capacity_kWh:.0f} kWh / {discharge_power_kW:.0f} kW "
         f"réduit la pointe réseau de {result.peak_before_kW:.0f} à {result.peak_after_kW:.0f} kW. "
         f"L'écrêtage garanti de {result.reduction_kW:.0f} kW représente environ "
-        f"{_fmt0(result.annual_saving_chf)} CHF/an d'économie de puissance."
+        f"{_fmt0(result.annual_saving_chf)} CHF/an d'économie de puissance. "
+        + limit_sentence
     )
-    # Compact conclusion at the bottom of page 1.
-    _info_box(pdf, x0, 252, 144, 27, "CONCLUSION", conclusion, LIGHT_BLUE, BLUE)
+    _info_box(pdf, x0, 250, 144, 31, "CONCLUSION", conclusion, LIGHT_BLUE, BLUE)
 
 
 def _page_2(
@@ -445,9 +477,9 @@ def _page_2(
     failed = _plot_failed_day(df, result, dt_hours)
     soc = _plot_soc(df, result, soc_min_pct, reserve_target_pct)
 
-    pdf.image(annual, x=x0, y=31, w=144, h=54)
-    pdf.image(failed, x=x0, y=91, w=144, h=54)
-    pdf.image(soc, x=x0, y=151, w=144, h=47)
+    pdf.image(annual, x=x0, y=29, w=144, h=59)
+    pdf.image(failed, x=x0, y=91, w=144, h=64)
+    pdf.image(soc, x=x0, y=158, w=144, h=44)
 
     reason = {
         "power": "la puissance de décharge maximale est atteinte",
@@ -456,14 +488,7 @@ def _page_2(
         "sequence": "une succession de pointes ne permet pas de restaurer suffisamment la réserve",
     }.get(result.failed_reason, "la configuration atteint sa limite")
 
-    failed_text = (
-        f"{result.failed_target_kW:.0f} kW n'est pas soutenable. "
-        f"Premier échec le {pd.Timestamp(result.failed_timestamp):%d.%m.%Y à %H:%M}. "
-        f"La puissance réseau atteint {result.failed_after_kW:.1f} kW, soit "
-        f"{result.failed_shortfall_kW:.1f} kW au-dessus de la cible. "
-        f"À cet instant, {reason}."
-    )
-    _info_box(pdf, x0, 205, 144, 32, "PREMIER SEUIL IMPOSSIBLE", failed_text, LIGHT_RED, RED)
+    _failed_threshold_box(pdf, x0, 205, 144, 36, result)
 
     if result.failed_reason == "power":
         action = "Augmenter la puissance de décharge peut permettre d'abaisser davantage le seuil."
@@ -474,8 +499,37 @@ def _page_2(
     else:
         action = "Augmenter la capacité et/ou optimiser la recharge de réserve peut permettre d'abaisser davantage le seuil."
 
-    _info_box(pdf, x0, 242, 69, 26, "DIAGNOSTIC", reason.capitalize() + ".", LIGHT_BLUE, BLUE)
-    _info_box(pdf, x0 + 75, 242, 69, 26, "ACTION POSSIBLE", action, LIGHT_GREEN, GREEN)
+    _info_box(pdf, x0, 246, 69, 27, "DIAGNOSTIC", reason.capitalize() + ".", LIGHT_BLUE, BLUE)
+    _info_box(pdf, x0 + 75, 246, 69, 27, "ACTION POSSIBLE", action, LIGHT_GREEN, GREEN)
+
+
+def _failed_threshold_box(pdf, x, y, w, h, result):
+    pdf.set_draw_color(*RED)
+    pdf.set_fill_color(*LIGHT_RED)
+    pdf.rect(x, y, w, h, style="DF")
+
+    pdf.set_xy(x + 5, y + 4)
+    pdf.set_font("Arial", "B", 8.2)
+    pdf.set_text_color(*RED)
+    pdf.cell(w - 10, 5, _tx(f"PREMIER SEUIL IMPOSSIBLE : {result.failed_target_kW:.0f} kW"))
+
+    rows = [
+        ("Date et heure", pd.Timestamp(result.failed_timestamp).strftime("%d.%m.%Y à %H:%M")),
+        ("Puissance réseau", f"{result.failed_after_kW:.1f} kW"),
+        ("Dépassement de la cible", f"+{result.failed_shortfall_kW:.1f} kW"),
+        ("Décharge batterie", f"{result.failed_discharge_kW:.1f} kW"),
+        ("SOC atteint", f"{result.failed_soc_pct:.1f} %"),
+    ]
+    yy = y + 12
+    for label, value in rows:
+        pdf.set_xy(x + 6, yy)
+        pdf.set_font("Arial", "B", 6.6)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(48, 4, _tx(label))
+        pdf.set_xy(x + 56, yy)
+        pdf.set_font("Arial", "", 6.8)
+        pdf.cell(w - 62, 4, _tx(value))
+        yy += 4.5
 
 
 def _table_header(pdf, x, y, widths, labels):
@@ -494,7 +548,9 @@ def _page_3(
     pdf, *,
     df, dt_hours, result, power_tariff,
     client_name, source_name, coverage_days,
-    capacity_kWh, discharge_power_kW, logo_path=None,
+    capacity_kWh, discharge_power_kW,
+    roundtrip_eff, soc_min_pct, reserve_target_pct, grid_recharge, target_resolution_kW,
+    logo_path=None,
 ):
     pdf.add_page()
     _side_bar(
@@ -542,6 +598,9 @@ def _page_3(
     before = np.asarray(df["import_kWh"], dtype=float) / dt_hours
     after = np.asarray(result.import_after_kWh_series, dtype=float) / dt_hours
     monthly = pd.DataFrame({"timestamp":ts, "Avant":before, "Après":after})
+    # Rapport client : garder l'année principale de la courbe (2025 ici).
+    dominant_year = int(monthly["timestamp"].dt.year.value_counts().idxmax())
+    monthly = monthly[monthly["timestamp"].dt.year == dominant_year].copy()
     monthly["Mois"] = monthly["timestamp"].dt.to_period("M")
     monthly = monthly.groupby("Mois")[["Avant","Après"]].max().reset_index()
     monthly["Réduction"] = monthly["Avant"] - monthly["Après"]
@@ -560,11 +619,51 @@ def _page_3(
             xx += w
         yy += 6
 
+    # Bottom blocks inspired by the approved mockup.
+    bottom_y = min(yy + 7, 218)
+    left_w = 80
+    right_w = 60
+
+    pdf.set_draw_color(*BORDER)
+    pdf.set_fill_color(*LIGHT_BG)
+    pdf.rect(x0, bottom_y, left_w, 52, style="DF")
+    pdf.set_xy(x0 + 4, bottom_y + 4)
+    pdf.set_font("Arial", "B", 7.5)
+    pdf.set_text_color(*SOLEOL_ORANGE)
+    pdf.cell(left_w - 8, 5, _tx("HYPOTHÈSES ET PARAMÈTRES DE CALCUL"))
+
+    rows = [
+        ("Mode de facturation", "Bande annuelle Groupe E"),
+        ("Tarif puissance", f"{power_tariff:.2f} CHF/kW/mois"),
+        ("Précision du seuil", f"{target_resolution_kW:.1f} kW"),
+        ("Rendement aller-retour", f"{roundtrip_eff*100:.0f} %"),
+        ("SOC minimum", f"{soc_min_pct:.0f} %"),
+        ("Réserve Peak Shaving", f"{reserve_target_pct:.0f} %"),
+        ("Recharge depuis le réseau", "Oui" if grid_recharge else "Non"),
+    ]
+    ry = bottom_y + 11
+    for label, value in rows:
+        pdf.set_xy(x0 + 4, ry)
+        pdf.set_font("Arial", "", 5.9)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(39, 4.7, _tx(label))
+        pdf.set_xy(x0 + 43, ry)
+        pdf.set_font("Arial", "B", 5.9)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(left_w - 47, 4.7, _tx(value), align="R")
+        ry += 5.1
+
     formula = (
-        f"{result.reduction_kW:.0f} kW x {power_tariff:.2f} CHF/kW/mois x 12 "
-        f"= {_fmt0(result.annual_saving_chf)} CHF/an."
+        f"{result.reduction_kW:.0f} kW x {power_tariff:.2f} CHF/kW/mois\n"
+        f"x 12 = {_fmt0(result.annual_saving_chf)} CHF/an"
     )
-    _info_box(pdf, x0, min(yy + 7, 257), 144, 24, "FORMULE D'ÉCONOMIE", formula, LIGHT_GREEN, GREEN)
+    _info_box(pdf, x0 + left_w + 4, bottom_y, right_w, 24, "FORMULE D'ÉCONOMIE", formula, LIGHT_GREEN, GREEN)
+
+    remarks = (
+        "Réductions mensuelles indicatives. Économie calculée sur la baisse de la bande annuelle. "
+        "Surplus PV utilisé en priorité. Résultats issus des données quart-horaires fournies."
+    )
+    _info_box(pdf, x0 + left_w + 4, bottom_y + 28, right_w, 36, "REMARQUES", remarks, LIGHT_BLUE, BLUE)
 
 
 def generate_peak_shaving_report(
@@ -581,6 +680,7 @@ def generate_peak_shaving_report(
     reserve_target_pct: float,
     grid_recharge: bool,
     power_tariff: float,
+    target_resolution_kW: float = 1.0,
     logo_path: str | None = None,
 ) -> bytes:
     pdf = ReportPDF(orientation="P", unit="mm", format="A4")
@@ -627,5 +727,10 @@ def generate_peak_shaving_report(
         dt_hours=dt_hours,
         result=result,
         power_tariff=power_tariff,
+        roundtrip_eff=roundtrip_eff,
+        soc_min_pct=soc_min_pct,
+        reserve_target_pct=reserve_target_pct,
+        grid_recharge=grid_recharge,
+        target_resolution_kW=target_resolution_kW,
     )
     return _pdf_bytes(pdf)

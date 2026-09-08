@@ -456,6 +456,7 @@ report_bytes = generate_peak_shaving_report(
     reserve_target_pct=reserve_target_pct,
     grid_recharge=grid_recharge,
     power_tariff=power_tariff,
+    target_resolution_kW=target_resolution,
 )
 
 st.download_button(
