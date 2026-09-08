@@ -35,6 +35,7 @@ st.markdown(
     .ps-value {font-size:1.8rem;font-weight:850;line-height:1.05;}
     .ps-subv {color:#94a3b8;font-size:.78rem;margin-top:8px;}
     .blue{color:#4f8cff}.green{color:#4ade80}.orange{color:#fb923c}.purple{color:#a855f7}.red{color:#ff6b6b}
+    .ps-good{color:#4ade80}.ps-bad{color:#ff6b6b}.ps-neutral{color:#4f8cff}
     @media(max-width:1100px){.ps-grid{grid-template-columns:repeat(2,minmax(160px,1fr));}}
     </style>
     """,
@@ -175,10 +176,10 @@ def _limiter_text(reason: str) -> str:
 st.markdown(
     f"""
     <div class="ps-grid">
-      <div class="ps-card"><div class="ps-label">Pointe avant</div><div class="ps-value orange">{f1(result.peak_before_kW)} kW</div><div class="ps-subv">Maximum mesuré</div></div>
+      <div class="ps-card"><div class="ps-label">Pointe avant</div><div class="ps-value blue">{f1(result.peak_before_kW)} kW</div><div class="ps-subv">Maximum mesuré</div></div>
       <div class="ps-card"><div class="ps-label">Seuil soutenable</div><div class="ps-value green">{f1(result.target_kW)} kW</div><div class="ps-subv">Trouvé automatiquement</div></div>
       <div class="ps-card"><div class="ps-label">Pointe après</div><div class="ps-value green">{f1(result.peak_after_kW)} kW</div><div class="ps-subv">Après simulation annuelle</div></div>
-      <div class="ps-card"><div class="ps-label">Écrêtage garanti</div><div class="ps-value blue">{f1(result.reduction_kW)} kW</div><div class="ps-subv">Réduction du maximum</div></div>
+      <div class="ps-card"><div class="ps-label">Écrêtage garanti</div><div class="ps-value green">{f1(result.reduction_kW)} kW</div><div class="ps-subv">Réduction du maximum</div></div>
       <div class="ps-card"><div class="ps-label">Économie puissance</div><div class="ps-value green">{f0(result.annual_saving_chf)} CHF/an</div><div class="ps-subv">{power_tariff:.2f} CHF/kW/mois</div></div>
     </div>
     """,
@@ -188,74 +189,116 @@ st.markdown(
 annual_cost_before = result.peak_before_kW * power_tariff * 12.0
 annual_cost_after = result.peak_after_kW * power_tariff * 12.0
 
-b1, b2, b3 = st.columns(3)
-b1.metric(
-    "Configuration batterie",
-    f"{capacity_kWh:.0f} kWh / {discharge_power_kW:.0f} kW",
-    help="Capacité nominale et puissance de décharge utilisées pour la simulation."
+st.markdown(
+    f"""
+    <div class="ps-grid" style="grid-template-columns:repeat(3,minmax(220px,1fr));">
+      <div class="ps-card">
+        <div class="ps-label">Configuration batterie</div>
+        <div class="ps-value blue">{capacity_kWh:.0f} kWh / {discharge_power_kW:.0f} kW</div>
+        <div class="ps-subv">Paramètre de simulation</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Coût puissance avant</div>
+        <div class="ps-value blue">{annual_cost_before:,.0f} CHF/an</div>
+        <div class="ps-subv">{result.peak_before_kW:.1f} kW × {power_tariff:.2f} CHF/kW/mois × 12</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Coût puissance après</div>
+        <div class="ps-value green">{annual_cost_after:,.0f} CHF/an</div>
+        <div class="ps-subv" style="color:#4ade80;font-weight:700;">Économie : {result.annual_saving_chf:,.0f} CHF/an</div>
+      </div>
+    </div>
+    """.replace(",", " "),
+    unsafe_allow_html=True,
 )
-b2.metric(
-    "Coût puissance avant",
-    f"{annual_cost_before:,.0f} CHF/an".replace(",", " "),
-    help=f"{result.peak_before_kW:.1f} kW × {power_tariff:.2f} CHF/kW/mois × 12"
-)
-b3.metric(
-    "Coût puissance après",
-    f"{annual_cost_after:,.0f} CHF/an".replace(",", " "),
-    delta=f"-{result.annual_saving_chf:,.0f} CHF/an".replace(",", " "),
-    help=f"{result.peak_after_kW:.1f} kW × {power_tariff:.2f} CHF/kW/mois × 12"
-)
-
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Énergie déchargée", f"{f0(result.battery_discharge_kWh)} kWh")
-c2.metric("Recharge réseau", f"{f0(result.grid_charge_kWh)} kWh")
-c3.metric("Recharge PV", f"{f0(result.pv_charge_kWh)} kWh")
-c4.metric("SOC minimum simulé", f"{np.min(result.soc_pct):.0f} %")
 
 power_headroom = max(discharge_power_kW - result.critical_discharge_kW, 0.0)
 soc_headroom = max(result.critical_soc_pct - soc_min_pct, 0.0)
-d1, d2 = st.columns(2)
-d1.metric(
-    "Marge puissance à l'intervalle limitant",
-    f"{power_headroom:.1f} kW",
-    help="Faible marge = augmenter les kW de la batterie peut améliorer l'écrêtage."
-)
-d2.metric(
-    "Marge SOC à l'intervalle limitant",
-    f"{soc_headroom:.1f} points",
-    help="Faible marge = augmenter les kWh / l'énergie disponible peut améliorer l'écrêtage."
+soc_min_sim = float(np.min(result.soc_pct))
+
+st.markdown(
+    f"""
+    <div class="ps-grid" style="grid-template-columns:repeat(4,minmax(180px,1fr));">
+      <div class="ps-card">
+        <div class="ps-label">Énergie déchargée</div>
+        <div class="ps-value blue">{f0(result.battery_discharge_kWh)} kWh</div>
+        <div class="ps-subv">Information énergétique</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Recharge réseau</div>
+        <div class="ps-value blue">{f0(result.grid_charge_kWh)} kWh</div>
+        <div class="ps-subv">Information énergétique</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Recharge PV</div>
+        <div class="ps-value green">{f0(result.pv_charge_kWh)} kWh</div>
+        <div class="ps-subv">Énergie solaire valorisée</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">SOC minimum simulé</div>
+        <div class="ps-value {"red" if soc_min_sim <= soc_min_pct + 1.0 else "blue"}">{soc_min_sim:.0f} %</div>
+        <div class="ps-subv">SOC minimum configuré : {soc_min_pct:.0f} %</div>
+      </div>
+    </div>
+    <div class="ps-grid" style="grid-template-columns:repeat(2,minmax(220px,1fr));">
+      <div class="ps-card">
+        <div class="ps-label">Marge puissance à l'intervalle limitant</div>
+        <div class="ps-value {"green" if power_headroom >= 20 else "red"}">{power_headroom:.1f} kW</div>
+        <div class="ps-subv">Marge restante en puissance de décharge</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Marge SOC à l'intervalle limitant</div>
+        <div class="ps-value {"green" if soc_headroom >= 10 else "red"}">{soc_headroom:.1f} points</div>
+        <div class="ps-subv">Marge restante au-dessus du SOC minimum</div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 st.subheader("Pourquoi ne peut-on pas descendre plus bas ?")
-st.error(
-    f"**{result.failed_target_kW:.1f} kW n'est pas soutenable.** "
-    f"Premier échec : **{result.failed_timestamp:%d.%m.%Y %H:%M}** — "
-    f"{_limiter_text(result.failed_reason)}. "
-    f"La puissance réseau atteint **{result.failed_after_kW:.1f} kW**, soit "
-    f"**{result.failed_shortfall_kW:.1f} kW** au-dessus de la cible. "
-    f"Décharge batterie : **{result.failed_discharge_kW:.1f} kW** ; "
-    f"SOC : **{result.failed_soc_pct:.1f} %**."
+st.markdown(
+    f"""
+    <div style="background:rgba(255,107,107,.14);border:1px solid rgba(255,107,107,.45);
+                border-radius:10px;padding:14px 16px;color:#ff8b8b;margin-bottom:10px;">
+      <b>{result.failed_target_kW:.1f} kW n'est pas soutenable.</b>
+      Premier échec : <b>{result.failed_timestamp:%d.%m.%Y %H:%M}</b> —
+      {_limiter_text(result.failed_reason)}.
+      La puissance réseau atteint <b>{result.failed_after_kW:.1f} kW</b>,
+      soit <b>{result.failed_shortfall_kW:.1f} kW</b> au-dessus de la cible.
+      Décharge batterie : <b>{result.failed_discharge_kW:.1f} kW</b> ;
+      SOC : <b>{result.failed_soc_pct:.1f} %</b>.
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 if result.failed_reason == "power":
-    st.warning(
-        "Diagnostic : la limite vient principalement des **kW de décharge**. "
-        "Augmenter la puissance batterie peut réduire davantage la bande."
-    )
+    diagnosis = "La limite vient principalement des kW de décharge."
+    recommendation = "Augmenter la puissance batterie peut réduire davantage la bande."
 elif result.failed_reason == "energy":
-    st.warning(
-        "Diagnostic : la limite vient principalement des **kWh disponibles / SOC**. "
-        "Augmenter la capacité énergétique peut réduire davantage la bande."
-    )
+    diagnosis = "La limite vient principalement des kWh disponibles / SOC."
+    recommendation = "Augmenter la capacité énergétique peut réduire davantage la bande."
 elif result.failed_reason == "power_and_energy":
-    st.warning(
-        "Diagnostic : **kW et kWh sont tous deux limitants** sur le premier seuil impossible."
-    )
+    diagnosis = "Les kW et les kWh sont tous deux limitants."
+    recommendation = "Il faut augmenter à la fois la puissance et la capacité pour réduire davantage la bande."
 else:
-    st.warning(
-        "Diagnostic : le seuil inférieur échoue à cause d'une **séquence de pointes** "
-        "et de la capacité de la batterie à restaurer sa réserve entre elles."
-    )
+    diagnosis = "Le seuil inférieur échoue à cause d'une succession de pointes et d'une réserve insuffisamment restaurée."
+    recommendation = "Augmenter la capacité et/ou améliorer la stratégie de recharge peut réduire davantage la bande."
+
+st.markdown(
+    f"""
+    <div style="background:rgba(79,140,255,.12);border:1px solid rgba(79,140,255,.40);
+                border-radius:10px;padding:12px 15px;color:#7fb0ff;margin-bottom:8px;">
+      <b>Diagnostic :</b> {diagnosis}
+    </div>
+    <div style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.38);
+                border-radius:10px;padding:12px 15px;color:#7cf09f;margin-bottom:16px;">
+      <b>Action possible :</b> {recommendation}
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # --------------------------------------------------------------- Overview chart
 ts = pd.to_datetime(df["timestamp"])
@@ -362,14 +405,9 @@ monthly = pd.DataFrame({
 monthly["Période"] = monthly["timestamp"].dt.to_period("M")
 monthly = monthly.groupby("Période")[["Avant (kW)", "Après (kW)"]].max()
 
-# Reindex Jan-Dec of every year present so late-year months never disappear from display.
-years = sorted(monthly.index.year.unique().tolist())
-full_periods = []
-for year in years:
-    full_periods.extend(pd.period_range(f"{year}-01", f"{year}-12", freq="M"))
-monthly = monthly.reindex(full_periods)
+# Keep only periods that really exist in the uploaded data.
 monthly.index.name = "Période"
-monthly = monthly.reset_index()
+monthly = monthly.sort_index().reset_index()
 monthly["Mois"] = monthly["Période"].astype(str)
 monthly["Réduction (kW)"] = monthly["Avant (kW)"] - monthly["Après (kW)"]
 monthly = monthly[["Mois", "Avant (kW)", "Après (kW)", "Réduction (kW)"]]
@@ -380,8 +418,7 @@ st.dataframe(
     hide_index=True,
     height=min(520, 42 + 35 * (len(monthly) + 1)),
 )
-if len(monthly) >= 12:
-    st.caption("Les 12 mois de l'année sont affichés dans le tableau ci-dessus.")
+st.caption(f"{len(monthly)} mois/périodes réellement présents dans le fichier sont affichés.")
 
 if billing_mode == "annual_band":
     st.caption(

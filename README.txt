@@ -47,3 +47,9 @@ V1.2 :
 - tableau mensuel forcé sur janvier-décembre.
 
 V1.3 : correction du titre rogné en haut et hauteur du tableau mensuel ajustée pour afficher les 12 mois sans masquer novembre/décembre.
+
+V1.4 :
+- code couleur cohérent : négatif/échec = rouge, positif = vert, information neutre = bleu ;
+- suppression du delta rouge trompeur sur l'économie ;
+- tableau mensuel limité aux périodes réellement présentes dans le fichier ;
+- diagnostic séparé en rouge (échec), bleu (diagnostic) et vert (action possible).
