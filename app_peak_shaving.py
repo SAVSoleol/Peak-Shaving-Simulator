@@ -166,10 +166,11 @@ def _limiter_text(reason: str) -> str:
         "power": "puissance de décharge maximale atteinte",
         "energy": "énergie disponible / SOC minimum limitant",
         "power_and_energy": "puissance et énergie toutes deux limitantes",
+        "sequence": "succession de pointes / réserve insuffisamment restaurée",
         "boundary": "intervalle le plus proche de la limite soutenable",
         "other": "combinaison de contraintes",
     }
-    return labels.get(str(reason), "intervalle le plus proche de la limite soutenable")
+    return labels.get(str(reason), "combinaison de contraintes")
 
 st.markdown(
     f"""
@@ -182,6 +183,27 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
+)
+
+annual_cost_before = result.peak_before_kW * power_tariff * 12.0
+annual_cost_after = result.peak_after_kW * power_tariff * 12.0
+
+b1, b2, b3 = st.columns(3)
+b1.metric(
+    "Configuration batterie",
+    f"{capacity_kWh:.0f} kWh / {discharge_power_kW:.0f} kW",
+    help="Capacité nominale et puissance de décharge utilisées pour la simulation."
+)
+b2.metric(
+    "Coût puissance avant",
+    f"{annual_cost_before:,.0f} CHF/an".replace(",", " "),
+    help=f"{result.peak_before_kW:.1f} kW × {power_tariff:.2f} CHF/kW/mois × 12"
+)
+b3.metric(
+    "Coût puissance après",
+    f"{annual_cost_after:,.0f} CHF/an".replace(",", " "),
+    delta=f"-{result.annual_saving_chf:,.0f} CHF/an".replace(",", " "),
+    help=f"{result.peak_after_kW:.1f} kW × {power_tariff:.2f} CHF/kW/mois × 12"
 )
 
 c1, c2, c3, c4 = st.columns(4)
@@ -204,23 +226,35 @@ d2.metric(
     help="Faible marge = augmenter les kWh / l'énergie disponible peut améliorer l'écrêtage."
 )
 
-if result.binding_reason == "power":
-    st.warning("La limite actuelle est principalement liée aux **kW de décharge**. Une batterie plus puissante pourrait abaisser davantage le seuil.")
-elif result.binding_reason == "energy":
-    st.warning("La limite actuelle est principalement liée aux **kWh disponibles / SOC**. Une capacité énergétique plus grande pourrait abaisser davantage le seuil.")
-elif result.binding_reason == "power_and_energy":
-    st.warning("La configuration est limitée à la fois par les **kW** et les **kWh**.")
-else:
-    st.caption("La configuration atteint son seuil soutenable sans saturation nette d'une seule contrainte.")
+st.subheader("Pourquoi ne peut-on pas descendre plus bas ?")
+st.error(
+    f"**{result.failed_target_kW:.1f} kW n'est pas soutenable.** "
+    f"Premier échec : **{result.failed_timestamp:%d.%m.%Y %H:%M}** — "
+    f"{_limiter_text(result.failed_reason)}. "
+    f"La puissance réseau atteint **{result.failed_after_kW:.1f} kW**, soit "
+    f"**{result.failed_shortfall_kW:.1f} kW** au-dessus de la cible. "
+    f"Décharge batterie : **{result.failed_discharge_kW:.1f} kW** ; "
+    f"SOC : **{result.failed_soc_pct:.1f} %**."
+)
 
-if result.critical_timestamp is not None:
-    st.info(
-        f"**Intervalle limitant : {result.critical_timestamp:%d.%m.%Y %H:%M}** — "
-        f"{_limiter_text(result.binding_reason)}. "
-        f"Avant : **{result.critical_before_kW:.1f} kW**, après : **{result.critical_after_kW:.1f} kW**, "
-        f"décharge batterie : **{result.critical_discharge_kW:.1f} kW**, "
-        f"SOC : **{result.critical_soc_pct:.1f} %**. "
-        "C'est cet intervalle qui se trouve le plus près de la limite de la configuration."
+if result.failed_reason == "power":
+    st.warning(
+        "Diagnostic : la limite vient principalement des **kW de décharge**. "
+        "Augmenter la puissance batterie peut réduire davantage la bande."
+    )
+elif result.failed_reason == "energy":
+    st.warning(
+        "Diagnostic : la limite vient principalement des **kWh disponibles / SOC**. "
+        "Augmenter la capacité énergétique peut réduire davantage la bande."
+    )
+elif result.failed_reason == "power_and_energy":
+    st.warning(
+        "Diagnostic : **kW et kWh sont tous deux limitants** sur le premier seuil impossible."
+    )
+else:
+    st.warning(
+        "Diagnostic : le seuil inférieur échoue à cause d'une **séquence de pointes** "
+        "et de la capacité de la batterie à restaurer sa réserve entre elles."
     )
 
 # --------------------------------------------------------------- Overview chart
@@ -253,7 +287,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # --------------------------------------------------------------- Critical day chart
-crit_ts = pd.Timestamp(result.critical_timestamp) if result.critical_timestamp is not None else ts.iloc[before_kw.argmax()]
+crit_ts = pd.Timestamp(result.failed_timestamp) if result.failed_timestamp is not None else ts.iloc[before_kw.argmax()]
 day = crit_ts.normalize()
 mask = ts.dt.normalize() == day
 
@@ -270,9 +304,20 @@ fig2.add_trace(go.Scatter(
     x=ts[mask], y=dis_kw[mask], name="Décharge batterie", mode="lines",
     line=dict(color="#a855f7", width=2, dash="dot"),
 ))
-fig2.add_hline(y=result.target_kW, line_dash="dash", line_color="#4f8cff")
+fig2.add_hline(
+    y=result.target_kW,
+    line_dash="dash",
+    line_color="#4f8cff",
+    annotation_text=f"Garanti {result.target_kW:.1f} kW",
+)
+fig2.add_hline(
+    y=result.failed_target_kW,
+    line_dash="dot",
+    line_color="#ff6b6b",
+    annotation_text=f"Impossible {result.failed_target_kW:.1f} kW",
+)
 fig2.update_layout(
-    title=f"Journée limitante : {crit_ts:%d.%m.%Y} — {_limiter_text(result.binding_reason)}",
+    title=f"Premier seuil impossible ({result.failed_target_kW:.1f} kW) : {crit_ts:%d.%m.%Y}",
     xaxis_title="Heure",
     yaxis_title="kW",
     height=430,
@@ -314,9 +359,20 @@ monthly = pd.DataFrame({
     "Avant (kW)": before_kw,
     "Après (kW)": after_kw,
 })
-monthly["Mois"] = monthly["timestamp"].dt.to_period("M").astype(str)
-monthly = monthly.groupby("Mois")[["Avant (kW)", "Après (kW)"]].max().reset_index()
+monthly["Période"] = monthly["timestamp"].dt.to_period("M")
+monthly = monthly.groupby("Période")[["Avant (kW)", "Après (kW)"]].max()
+
+# Reindex Jan-Dec of every year present so late-year months never disappear from display.
+years = sorted(monthly.index.year.unique().tolist())
+full_periods = []
+for year in years:
+    full_periods.extend(pd.period_range(f"{year}-01", f"{year}-12", freq="M"))
+monthly = monthly.reindex(full_periods)
+monthly.index.name = "Période"
+monthly = monthly.reset_index()
+monthly["Mois"] = monthly["Période"].astype(str)
 monthly["Réduction (kW)"] = monthly["Avant (kW)"] - monthly["Après (kW)"]
+monthly = monthly[["Mois", "Avant (kW)", "Après (kW)", "Réduction (kW)"]]
 st.subheader("Pointes mensuelles")
 st.dataframe(monthly.round(1), use_container_width=True, hide_index=True)
 if billing_mode == "annual_band":
@@ -332,7 +388,8 @@ else:
     )
 
 st.caption(
-    "Le calcul recherche le plus petit seuil que la batterie peut maintenir sur toute la courbe. "
+    f"Seuil garanti : {result.target_kW:.1f} kW. "
+    f"Premier seuil inférieur testé : {result.failed_target_kW:.1f} kW, non soutenable. "
     "La recharge réseau est limitée par la puissance de charge et par la marge disponible sous le seuil. "
     "Le surplus PV est utilisé en priorité lorsqu'il est disponible."
 )

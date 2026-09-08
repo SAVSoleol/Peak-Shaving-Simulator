@@ -45,6 +45,15 @@ class PeakResult:
     critical_after_kW: float
     critical_discharge_kW: float
     critical_soc_pct: float
+    failed_target_kW: float
+    failed_peak_after_kW: float
+    failed_timestamp: pd.Timestamp | None
+    failed_before_kW: float
+    failed_after_kW: float
+    failed_discharge_kW: float
+    failed_soc_pct: float
+    failed_shortfall_kW: float
+    failed_reason: str
 
 
 def _eta_components(roundtrip_eff: float) -> tuple[float, float]:
@@ -227,6 +236,88 @@ def simulate_target(
     }
 
 
+
+def _diagnose_failed_target(
+    import_kWh,
+    export_kWh,
+    timestamps,
+    *,
+    dt_hours: float,
+    capacity_kWh: float,
+    charge_power_kW: float,
+    discharge_power_kW: float,
+    roundtrip_eff: float,
+    soc_min_pct: float,
+    reserve_target_pct: float,
+    target_kW: float,
+    grid_recharge: bool,
+) -> dict:
+    """Simulate an intentionally-too-low target and identify the first real failure.
+
+    The useful diagnostic is not the successful boundary interval. It is the first
+    interval where the requested target cannot be held, and whether the shortfall
+    comes from discharge power, available energy/SOC, or both.
+    """
+    r = simulate_target(
+        import_kWh,
+        export_kWh,
+        timestamps,
+        dt_hours=dt_hours,
+        capacity_kWh=capacity_kWh,
+        charge_power_kW=charge_power_kW,
+        discharge_power_kW=discharge_power_kW,
+        roundtrip_eff=roundtrip_eff,
+        soc_min_pct=soc_min_pct,
+        reserve_target_pct=reserve_target_pct,
+        target_kW=target_kW,
+        grid_recharge=grid_recharge,
+    )
+
+    imp = np.asarray(import_kWh, dtype=float)
+    ts = pd.to_datetime(timestamps)
+    after_kw = np.asarray(r["import_after_kWh_series"], dtype=float) / dt_hours
+    before_kw = imp / dt_hours
+    dis_kw = np.asarray(r["battery_discharge_kWh_series"], dtype=float) / dt_hours
+    soc_pct = np.asarray(r["soc_pct"], dtype=float)
+
+    # Find the first interval that actually exceeds the requested target.
+    viol = np.where(after_kw > float(target_kW) + 1e-6)[0]
+    if len(viol) == 0:
+        idx = int(np.argmax(after_kw))
+    else:
+        idx = int(viol[0])
+
+    shortfall = max(float(after_kw[idx] - target_kW), 0.0)
+    power_tol = max(0.5, 0.002 * max(float(discharge_power_kW), 1.0))
+    soc_tol = max(0.5, 0.002 * 100.0)
+
+    power_lim = float(dis_kw[idx]) >= float(discharge_power_kW) - power_tol
+    energy_lim = float(soc_pct[idx]) <= float(soc_min_pct) + soc_tol
+
+    if power_lim and energy_lim:
+        reason = "power_and_energy"
+    elif power_lim:
+        reason = "power"
+    elif energy_lim:
+        reason = "energy"
+    else:
+        # A sequential-energy limitation can appear before SOC reaches the absolute
+        # minimum at the exact failing interval because prior intervals consumed the
+        # reserve. Treat this as a sequence limitation.
+        reason = "sequence"
+
+    return {
+        "target_kW": float(target_kW),
+        "peak_after_kW": float(np.max(after_kw)),
+        "timestamp": pd.Timestamp(ts[idx]),
+        "before_kW": float(before_kw[idx]),
+        "after_kW": float(after_kw[idx]),
+        "discharge_kW": float(dis_kw[idx]),
+        "soc_pct": float(soc_pct[idx]),
+        "shortfall_kW": float(shortfall),
+        "reason": reason,
+    }
+
 def find_min_sustainable_target(
     import_kWh,
     export_kWh,
@@ -298,6 +389,24 @@ def find_min_sustainable_target(
 
     reduction = max(float(r["peak_before_kW"]) - float(r["peak_after_kW"]), 0.0)
 
+    # Diagnose the first target immediately below the guaranteed threshold.
+    # This is the most useful engineering explanation of "why not lower?".
+    failed_target = max(0.0, float(target) - res)
+    failed = _diagnose_failed_target(
+        import_kWh,
+        export_kWh,
+        timestamps,
+        dt_hours=dt_hours,
+        capacity_kWh=capacity_kWh,
+        charge_power_kW=charge_power_kW,
+        discharge_power_kW=discharge_power_kW,
+        roundtrip_eff=roundtrip_eff,
+        soc_min_pct=soc_min_pct,
+        reserve_target_pct=reserve_target_pct,
+        target_kW=failed_target,
+        grid_recharge=grid_recharge,
+    )
+
     mode = str(billing_mode or "annual_band").lower()
     tariff = max(float(tariff_chf_per_kw_month), 0.0)
 
@@ -341,6 +450,15 @@ def find_min_sustainable_target(
         critical_after_kW=float(r["critical_after_kW"]),
         critical_discharge_kW=float(r["critical_discharge_kW"]),
         critical_soc_pct=float(r["critical_soc_pct"]),
+        failed_target_kW=float(failed["target_kW"]),
+        failed_peak_after_kW=float(failed["peak_after_kW"]),
+        failed_timestamp=failed["timestamp"],
+        failed_before_kW=float(failed["before_kW"]),
+        failed_after_kW=float(failed["after_kW"]),
+        failed_discharge_kW=float(failed["discharge_kW"]),
+        failed_soc_pct=float(failed["soc_pct"]),
+        failed_shortfall_kW=float(failed["shortfall_kW"]),
+        failed_reason=str(failed["reason"]),
     )
 
 

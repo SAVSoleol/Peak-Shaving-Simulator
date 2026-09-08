@@ -37,3 +37,11 @@ Fichier de test fourni par l'utilisateur
 Mivelaz_Bois_2025_Import_Export_kW(3).xlsx
 
 V1.1 : identification de l'intervalle réellement limitant, diagnostic kW/kWh, correction du tableau mensuel en bande annuelle.
+
+V1.2 :
+- analyse du premier seuil inférieur impossible ;
+- identification de la vraie cause d'échec (kW, kWh, les deux, ou séquence de pointes) ;
+- affichage batterie dans le résumé ;
+- coût annuel de puissance avant/après ;
+- graphique de la journée du premier échec ;
+- tableau mensuel forcé sur janvier-décembre.
