@@ -236,7 +236,7 @@ def _plot_annual(df, result, dt_hours: float) -> BytesIO:
     ax.plot(ts, after, lw=0.95, color="#2EAD63", label="Puissance après")
     ax.axhline(result.target_kW, color="#2563EB", ls="--", lw=1.1, label=f"Seuil {result.target_kW:.0f} kW")
     ax.set_ylabel("kW", fontsize=9)
-    ax.set_title("Puissance réseau avant / après Peak Shaving", fontsize=12, weight="bold", pad=6)
+    ax.set_title("Puissance réseau avant / après Peak Shaving", fontsize=12, weight="bold", pad=8)
     ax.legend(ncol=3, fontsize=8.3, frameon=False, loc="upper center")
     ax.grid(alpha=.18)
     ax.tick_params(axis="both", labelsize=8)
