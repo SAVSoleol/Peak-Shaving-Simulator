@@ -267,7 +267,7 @@ def _plot_failed_day(df, result, dt_hours: float) -> BytesIO:
     ax.set_ylabel("kW", fontsize=9)
     ax.set_title(
         f"Premier seuil impossible - {pd.Timestamp(result.failed_timestamp):%d.%m.%Y}",
-        fontsize=12, weight="bold", pad=6,
+        fontsize=12, weight="bold", pad=8,
     )
     ax.legend(ncol=5, fontsize=7.8, frameon=False, loc="upper center")
     ax.grid(alpha=.18)
