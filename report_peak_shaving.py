@@ -112,7 +112,7 @@ def _side_bar(
 
     logo = _resolve_logo_path(logo_path)
     if logo:
-        pdf.image(logo, x=6, y=30, w=40)
+        pdf.image(logo, x=5, y=25, w=40)
     else:
         pdf.set_xy(8, 12)
         pdf.set_font("Arial", "B", 16)
